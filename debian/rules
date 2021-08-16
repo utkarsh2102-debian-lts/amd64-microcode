@@ -1,0 +1,33 @@
+#!/usr/bin/make -f
+# debian/rules for amd64-microcode
+# Copyright (C) 2012-2016 by Henrique de Moraes Holschuh
+# Published under the GNU GPL license version 2 or any later versions
+
+PACKAGE := amd64-microcode
+DEBDIR  := $(CURDIR)/debian
+PKGDIR  := $(DEBDIR)/$(PACKAGE)
+
+# DebHelper control
+export DH_ALWAYS_EXCLUDE=CVS:.svn:.git
+
+# Work around Debian bug #688794
+INITRAMFS_NAME := $(subst -,_,$(subst +,_,$(subst .,_,$(PACKAGE))))
+
+# For reproducible builds...
+CHANGELOG_TS :=$(shell date -u +%s --date=$(shell dpkg-parsechangelog | sed -n -e "/^Version:/ {s/.*\.\([0-9]\{8\}\)\..*/\1/;p}"))
+
+%:
+	dh $@
+
+override_dh_auto_install:
+	dh_testdir
+	dh_install
+	mkdir -p "$(PKGDIR)/usr/share/initramfs-tools/hooks"
+	sed -e "s/@CHANGELOG_TS@/$(CHANGELOG_TS)/g" \
+	    <"$(DEBDIR)/initramfs.hook" \
+	    >"$(PKGDIR)/usr/share/initramfs-tools/hooks/$(INITRAMFS_NAME)"
+	chmod 755 "$(PKGDIR)/usr/share/initramfs-tools/hooks/$(INITRAMFS_NAME)"
+	# We have a /etc/default file, but no initscript
+	install -m 644 "$(DEBDIR)/$(PACKAGE).default" "$(PKGDIR)/etc/default/$(PACKAGE)"
+	# modprobe.d blacklist
+	install -m 644 "$(DEBDIR)/$(PACKAGE).modprobe-blacklist" "$(PKGDIR)/etc/modprobe.d/$(PACKAGE)-blacklist.conf"
